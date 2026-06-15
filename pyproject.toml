@@ -1,7 +1,21 @@
 [project]
 name = "ogi-projekat"
 version = "0.1.0"
-description = "Add your description here"
+description = "Monitoring poljoprivrednih parcela - GIS aplikacija za evidenciju i analizu poljoprivrednih površina"
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = []
+dependencies = [
+    "psycopg2-binary>=2.9",
+    "pandas>=2.0",
+    "geopandas>=0.14",
+    "shapely>=2.0",
+    "matplotlib>=3.8",
+    "folium>=0.17",
+    "rasterio>=1.3",
+    "scikit-learn>=1.3",
+    "opencv-python>=4.8",
+    "numpy>=1.24",
+    "fiona>=1.9",
+    "contextily>=1.3",
+    "descartes>=1.1",
+]

@@ -1,0 +1,1052 @@
+<!doctype html>
+<html lang="sr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AgroSrem — Evidencija i Analiza Poljoprivrednih Površina</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css"
+    />
+    <style>
+      :root {
+        --agro-green: #2d6a4f;
+        --agro-light: #52b788;
+        --agro-gold: #e9c46a;
+        --agro-soil: #b08968;
+      }
+
+      body {
+        background: #f8f9fa;
+        font-family: "Segoe UI", system-ui, sans-serif;
+      }
+
+      .navbar-brand {
+        font-weight: 700;
+        color: var(--agro-green) !important;
+      }
+      .navbar-brand i {
+        color: var(--agro-light);
+      }
+
+      .card {
+        border: none;
+        border-radius: 12px;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+        margin-bottom: 20px;
+        transition: transform 0.15s;
+      }
+      .card:hover {
+        transform: translateY(-2px);
+      }
+      .card-header {
+        border-radius: 12px 12px 0 0 !important;
+        font-weight: 600;
+      }
+
+      .stat-card {
+        text-align: center;
+        padding: 18px 10px;
+      }
+      .stat-card .stat-value {
+        font-size: 2.2rem;
+        font-weight: 700;
+        color: var(--agro-green);
+      }
+      .stat-card .stat-label {
+        font-size: 0.85rem;
+        color: #6c757d;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+
+      .table-container {
+        max-height: 420px;
+        overflow-y: auto;
+      }
+      .table th {
+        position: sticky;
+        top: 0;
+        background: #fff;
+        z-index: 1;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        color: #6c757d;
+      }
+      .table td {
+        font-size: 0.85rem;
+        vertical-align: middle;
+      }
+
+      .tab-content {
+        padding-top: 15px;
+      }
+      .nav-pills .nav-link.active {
+        background: var(--agro-green);
+      }
+      .nav-pills .nav-link {
+        color: var(--agro-green);
+      }
+
+      .btn-agro {
+        background: var(--agro-green);
+        color: white;
+        border: none;
+      }
+      .btn-agro:hover {
+        background: var(--agro-light);
+        color: white;
+      }
+      .btn-outline-agro {
+        border: 2px solid var(--agro-green);
+        color: var(--agro-green);
+      }
+      .btn-outline-agro:hover {
+        background: var(--agro-green);
+        color: white;
+      }
+
+      .badge-preciznost {
+        font-size: 0.75rem;
+      }
+
+      .map-iframe {
+        width: 100%;
+        height: 600px;
+        border: 2px solid #dee2e6;
+        border-radius: 12px;
+      }
+
+      .crop-badge {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: white;
+      }
+
+      #loading-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(255, 255, 255, 0.85);
+        z-index: 9999;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+      }
+
+      .toast-container {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 9999;
+      }
+
+      pre.join-query {
+        background: #f8f9fa;
+        border-left: 4px solid var(--agro-green);
+        padding: 10px;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        max-height: 150px;
+        overflow: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="d-flex">
+      <div class="spinner-border text-success mb-2" role="status"></div>
+      <strong class="text-success">Učitavanje podataka...</strong>
+    </div>
+
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg bg-white shadow-sm sticky-top">
+      <div class="container-fluid">
+        <a class="navbar-brand" href="#">
+          <i class="bi bi-tree-fill"></i> AgroSrem
+        </a>
+        <span class="badge bg-success me-2">Srem</span>
+        <div class="d-flex gap-2">
+          <button
+            class="btn btn-outline-agro btn-sm"
+            onclick="initDatabase()"
+            id="btn-init"
+          >
+            <i class="bi bi-database-add"></i> Inicijalizuj bazu
+          </button>
+          <button
+            class="btn btn-outline-secondary btn-sm"
+            onclick="refreshAll()"
+          >
+            <i class="bi bi-arrow-clockwise"></i> Osveži
+          </button>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container-fluid py-3">
+      <!-- Dashboard kartice -->
+      <div class="row g-3 mb-3" id="stats-row">
+        <div class="col-md-2">
+          <div class="card stat-card">
+            <div class="stat-value" id="stat-tables">6</div>
+            <div class="stat-label">Tabela u bazi</div>
+          </div>
+        </div>
+        <div class="col-md-2">
+          <div class="card stat-card">
+            <div class="stat-value" id="stat-layers">5</div>
+            <div class="stat-label">GIS slojeva</div>
+          </div>
+        </div>
+        <div class="col-md-2">
+          <div class="card stat-card">
+            <div class="stat-value" id="stat-ml">0</div>
+            <div class="stat-label">ML detekcija</div>
+          </div>
+        </div>
+        <div class="col-md-2">
+          <div class="card stat-card">
+            <div class="stat-value" id="stat-overlays">9</div>
+            <div class="stat-label">Overlay analiza</div>
+          </div>
+        </div>
+        <div class="col-md-2">
+          <div class="card stat-card">
+            <div class="stat-value" id="stat-joins">7</div>
+            <div class="stat-label">JOIN upita</div>
+          </div>
+        </div>
+        <div class="col-md-2">
+          <div class="card stat-card">
+            <div class="stat-value" id="stat-crops">6</div>
+            <div class="stat-label">Tipova useva</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabovi -->
+      <ul class="nav nav-pills mb-3" id="mainTabs" role="tablist">
+        <li class="nav-item">
+          <button
+            class="nav-link active"
+            data-bs-toggle="tab"
+            data-bs-target="#tab-db"
+          >
+            🗄️ Baza podataka
+          </button>
+        </li>
+        <li class="nav-item">
+          <button
+            class="nav-link"
+            data-bs-toggle="tab"
+            data-bs-target="#tab-joins"
+          >
+            🔗 JOIN upiti
+          </button>
+        </li>
+        <li class="nav-item">
+          <button
+            class="nav-link"
+            data-bs-toggle="tab"
+            data-bs-target="#tab-gis"
+          >
+            🗺️ GIS & Overlay
+          </button>
+        </li>
+        <li class="nav-item">
+          <button
+            class="nav-link"
+            data-bs-toggle="tab"
+            data-bs-target="#tab-ml"
+          >
+            🤖 ML Klasifikacija
+          </button>
+        </li>
+        <li class="nav-item">
+          <button
+            class="nav-link"
+            data-bs-toggle="tab"
+            data-bs-target="#tab-map"
+          >
+            🌍 Interaktivna mapa
+          </button>
+        </li>
+      </ul>
+
+      <div class="tab-content">
+        <!-- TAB 1: Baza podataka -->
+        <div class="tab-pane fade show active" id="tab-db">
+          <div class="row">
+            <div class="col-md-3">
+              <div class="card">
+                <div class="card-header bg-success text-white">📋 Tabele</div>
+                <div class="list-group list-group-flush" id="table-list">
+                  <a
+                    href="#"
+                    class="list-group-item list-group-item-action"
+                    data-table="tipovi_zemljista"
+                    >Tipovi zemljišta</a
+                  >
+                  <a
+                    href="#"
+                    class="list-group-item list-group-item-action"
+                    data-table="katastarske_opstine"
+                    >Katastarske opštine</a
+                  >
+                  <a
+                    href="#"
+                    class="list-group-item list-group-item-action"
+                    data-table="vlasnici"
+                    >Vlasnici</a
+                  >
+                  <a
+                    href="#"
+                    class="list-group-item list-group-item-action"
+                    data-table="parcele"
+                    >Parcele</a
+                  >
+                  <a
+                    href="#"
+                    class="list-group-item list-group-item-action"
+                    data-table="usevi"
+                    >Usevi</a
+                  >
+                  <a
+                    href="#"
+                    class="list-group-item list-group-item-action"
+                    data-table="nadzor"
+                    >Nadzor</a
+                  >
+                </div>
+              </div>
+            </div>
+            <div class="col-md-9">
+              <div class="card">
+                <div
+                  class="card-header d-flex justify-content-between align-items-center"
+                >
+                  <span id="current-table-name">Izaberite tabelu</span>
+                  <div class="btn-group btn-group-sm">
+                    <button
+                      class="btn btn-outline-success"
+                      onclick="showCRUDModal('insert')"
+                    >
+                      <i class="bi bi-plus-circle"></i> Dodaj
+                    </button>
+                    <button
+                      class="btn btn-outline-warning"
+                      onclick="showCRUDModal('update')"
+                    >
+                      <i class="bi bi-pencil"></i> Ažuriraj
+                    </button>
+                    <button
+                      class="btn btn-outline-danger"
+                      onclick="showCRUDModal('delete')"
+                    >
+                      <i class="bi bi-trash"></i> Obriši
+                    </button>
+                  </div>
+                </div>
+                <div class="table-container">
+                  <table
+                    class="table table-hover table-sm mb-0"
+                    id="data-table"
+                  >
+                    <thead id="data-table-head"></thead>
+                    <tbody id="data-table-body"></tbody>
+                  </table>
+                </div>
+                <div class="card-footer text-muted small" id="table-footer">
+                  Odaberite tabelu za prikaz podataka.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 2: JOIN upiti -->
+        <div class="tab-pane fade" id="tab-joins">
+          <div class="row" id="join-results-container">
+            <div class="col-12 text-center py-5">
+              <div class="spinner-border text-success"></div>
+              <p class="mt-2">Učitavanje JOIN upita...</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 3: GIS & Overlay -->
+        <div class="tab-pane fade" id="tab-gis">
+          <div class="row mb-3">
+            <div class="col-md-6">
+              <div class="card">
+                <div class="card-header bg-info text-white">
+                  🗂️ GIS Slojevi (Srem)
+                </div>
+                <div class="table-container">
+                  <table
+                    class="table table-hover table-sm mb-0"
+                    id="slojevi-table"
+                  >
+                    <thead>
+                      <tr>
+                        <th>Sloj</th>
+                        <th>Objekata</th>
+                        <th>Tip geometrije</th>
+                        <th>CRS</th>
+                      </tr>
+                    </thead>
+                    <tbody></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="card">
+                <div class="card-header bg-warning text-dark">
+                  🔬 Overlay / Prostorne analize
+                </div>
+                <div class="table-container">
+                  <table
+                    class="table table-hover table-sm mb-0"
+                    id="overlay-table"
+                  >
+                    <thead>
+                      <tr>
+                        <th>Naziv analize</th>
+                        <th>Broj geometrija</th>
+                      </tr>
+                    </thead>
+                    <tbody></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 4: ML Klasifikacija -->
+        <div class="tab-pane fade" id="tab-ml">
+          <div class="row mb-3">
+            <div class="col-md-4">
+              <div class="card">
+                <div class="card-header bg-dark text-white">
+                  🤖 Model: Random Forest
+                </div>
+                <div class="card-body" id="ml-model-info">
+                  <p>
+                    7 karakteristika (NDVI, temperatura, vlažnost, red, NIR,
+                    NDWI, SAVI)
+                  </p>
+                  <p>
+                    6 klasa useva: Pšenica, Kukuruz, Suncokret, Soja, Ječam,
+                    Krompir
+                  </p>
+                  <p class="small text-muted">
+                    Treniran na 500 simuliranih uzoraka
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-8">
+              <div class="card">
+                <div class="card-header bg-dark text-white">
+                  📊 Statistike detekcija
+                </div>
+                <div class="table-container">
+                  <table
+                    class="table table-hover table-sm mb-0"
+                    id="ml-stats-table"
+                  >
+                    <thead>
+                      <tr>
+                        <th>Usev</th>
+                        <th>Broj</th>
+                        <th>Prosečna površina (ha)</th>
+                        <th>Prosečan NDVI</th>
+                        <th>Prosečna pouzdanost</th>
+                        <th>Ukupna površina (ha)</th>
+                      </tr>
+                    </thead>
+                    <tbody></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div
+              class="card-header bg-dark text-white d-flex justify-content-between align-items-center"
+            >
+              <span>🎯 Detektovani usevi (25 simuliranih snimaka u Sremu)</span>
+              <button
+                class="btn btn-outline-light btn-sm"
+                onclick="showMLUpdate()"
+              >
+                <i class="bi bi-pencil"></i> Izmeni atribut
+              </button>
+            </div>
+            <div class="table-container">
+              <table
+                class="table table-hover table-sm mb-0"
+                id="ml-detections-table"
+              >
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Usev</th>
+                    <th>Pouzdanost %</th>
+                    <th>NDVI</th>
+                    <th>LAI</th>
+                    <th>Površina (ha)</th>
+                    <th>Temp °C</th>
+                    <th>Vlažnost %</th>
+                    <th>Lat</th>
+                    <th>Lon</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 5: Interaktivna mapa -->
+        <div class="tab-pane fade" id="tab-map">
+          <div class="card">
+            <div class="card-header bg-success text-white">
+              🗺️ Interaktivna GIS mapa — Srem (NDVI raster + vektorski slojevi +
+              ML detekcije)
+            </div>
+            <div class="card-body p-0">
+              <iframe src="/map" class="map-iframe" id="map-iframe"></iframe>
+            </div>
+            <div class="card-footer small text-muted">
+              Legenda:
+              <span style="color: #228b22">■ Poljoprivredne površine</span>
+              &nbsp; <span style="color: #1e90ff">■ Vodotokovi</span> &nbsp;
+              <span style="color: #ffd700">■ Putevi</span> &nbsp;
+              <span style="color: #ff4500">● Objekti</span> &nbsp;
+              <span style="color: #32cd32">■ Prirodne oblasti</span> &nbsp;
+              <span style="color: #ff0000">◆ ML detekcije</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CRUD Modal -->
+    <div class="modal fade" id="crudModal" tabindex="-1">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="crudModalTitle">CRUD Operacija</h5>
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="modal"
+            ></button>
+          </div>
+          <div class="modal-body" id="crudModalBody"></div>
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn btn-secondary"
+              data-bs-dismiss="modal"
+            >
+              Otkaži
+            </button>
+            <button
+              type="button"
+              class="btn btn-agro"
+              id="crudSubmitBtn"
+              onclick="executeCRUD()"
+            >
+              Izvrši
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ML Update Modal -->
+    <div class="modal fade" id="mlUpdateModal" tabindex="-1">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Izmena atributa ML detekcije</h5>
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="modal"
+            ></button>
+          </div>
+          <div class="modal-body">
+            <div class="mb-3">
+              <label class="form-label">Indeks detekcije (0–24)</label>
+              <input
+                type="number"
+                class="form-control"
+                id="ml-update-index"
+                min="0"
+                max="24"
+                value="0"
+              />
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Tip useva</label>
+              <select class="form-select" id="ml-update-crop">
+                <option>Pšenica</option>
+                <option>Kukuruz</option>
+                <option>Suncokret</option>
+                <option>Soja</option>
+                <option>Ječam</option>
+                <option>Krompir</option>
+              </select>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Pouzdanost (%)</label>
+              <input
+                type="number"
+                class="form-control"
+                id="ml-update-confidence"
+                min="0"
+                max="100"
+                step="0.1"
+                value="95.0"
+              />
+            </div>
+            <div class="mb-3">
+              <label class="form-label">NDVI vrednost</label>
+              <input
+                type="number"
+                class="form-control"
+                id="ml-update-ndvi"
+                min="0"
+                max="1"
+                step="0.01"
+                value="0.75"
+              />
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn btn-secondary"
+              data-bs-dismiss="modal"
+            >
+              Otkaži
+            </button>
+            <button
+              type="button"
+              class="btn btn-agro"
+              onclick="updateMLDetection()"
+            >
+              Sačuvaj
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toasts -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+      // ======================== GLOBAL ========================
+      let currentTable = "";
+      let currentCRUDAction = "";
+
+      function showLoading() {
+        document.getElementById("loading-overlay").style.display = "flex";
+      }
+      function hideLoading() {
+        document.getElementById("loading-overlay").style.display = "none";
+      }
+
+      function showToast(msg, type = "success") {
+        const container = document.getElementById("toast-container");
+        const bg = type === "error" ? "bg-danger" : "bg-success";
+        const toast = document.createElement("div");
+        toast.className = `toast align-items-center text-white ${bg} border-0`;
+        toast.role = "alert";
+        toast.innerHTML = `<div class="d-flex"><div class="toast-body">${msg}</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div>`;
+        container.appendChild(toast);
+        const bsToast = new bootstrap.Toast(toast, { delay: 4000 });
+        bsToast.show();
+        toast.addEventListener("hidden.bs.toast", () => toast.remove());
+      }
+
+      async function apiFetch(url, options = {}) {
+        try {
+          const resp = await fetch(url, options);
+          if (!resp.ok) {
+            const err = await resp
+              .json()
+              .catch(() => ({ message: `HTTP ${resp.status}` }));
+            showToast(err.message || err.error || "Greška", "error");
+            return null;
+          }
+          return await resp.json();
+        } catch (e) {
+          showToast(`Mrežna greška: ${e.message}`, "error");
+          return null;
+        }
+      }
+
+      // ======================== INICIJALIZACIJA ========================
+      async function initDatabase() {
+        showLoading();
+        const btn = document.getElementById("btn-init");
+        btn.disabled = true;
+        btn.innerHTML =
+          '<span class="spinner-border spinner-border-sm"></span> Inicijalizujem...';
+
+        const data = await apiFetch("/api/init", { method: "POST" });
+        if (data && data.status === "ok") {
+          showToast("✅ Baza je uspešno inicijalizovana!");
+          await refreshAll();
+        }
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-database-add"></i> Inicijalizuj bazu';
+        hideLoading();
+      }
+
+      async function refreshAll() {
+        showLoading();
+        await loadDashboard();
+        await loadTableList();
+        if (currentTable) await loadTableData(currentTable);
+        await loadJoins();
+        await loadGISInfo();
+        await loadMLData();
+        hideLoading();
+        showToast("✅ Podaci osveženi");
+      }
+
+      async function loadDashboard() {
+        const data = await apiFetch("/api/dashboard");
+        if (!data) return;
+        document.getElementById("stat-tables").textContent = Object.keys(
+          data.tables || {},
+        ).length;
+        document.getElementById("stat-layers").textContent = (
+          data.gis_layers || []
+        ).length;
+        document.getElementById("stat-ml").textContent =
+          data.ml_total_detections || 0;
+        document.getElementById("stat-overlays").textContent =
+          data.overlay_count || 0;
+        document.getElementById("stat-joins").textContent =
+          data.join_queries_count || 0;
+        document.getElementById("stat-crops").textContent = (
+          data.ml_crop_types || []
+        ).length;
+      }
+
+      // ======================== TAB 1: BAZA PODATAKA ========================
+      async function loadTableList() {
+        const data = await apiFetch("/api/tables");
+        if (!data) return;
+
+        const list = document.getElementById("table-list");
+        list.innerHTML = "";
+        for (const [name, info] of Object.entries(data)) {
+          const a = document.createElement("a");
+          a.href = "#";
+          a.className =
+            "list-group-item list-group-item-action d-flex justify-content-between align-items-center";
+          a.dataset.table = name;
+          a.innerHTML = `${name.replace(/_/g, " ")} <span class="badge bg-success rounded-pill">${info.row_count}</span>`;
+          a.onclick = (e) => {
+            e.preventDefault();
+            loadTableData(name);
+          };
+          list.appendChild(a);
+        }
+      }
+
+      async function loadTableData(tableName) {
+        currentTable = tableName;
+        document.getElementById("current-table-name").textContent = tableName
+          .replace(/_/g, " ")
+          .toUpperCase();
+        const data = await apiFetch(`/api/tables/${tableName}`);
+        if (!data) return;
+
+        const head = document.getElementById("data-table-head");
+        const body = document.getElementById("data-table-body");
+        const footer = document.getElementById("table-footer");
+
+        head.innerHTML =
+          "<tr>" + data.columns.map((c) => `<th>${c}</th>`).join("") + "</tr>";
+        body.innerHTML = data.data
+          .map(
+            (row) =>
+              "<tr>" +
+              data.columns
+                .map((c) => `<td>${row[c] !== undefined ? row[c] : ""}</td>`)
+                .join("") +
+              "</tr>",
+          )
+          .join("");
+        footer.textContent = `Prikazano ${data.data.length} redova iz tabele "${tableName}".`;
+
+        // Označi aktivnu tabelu u listi
+        document
+          .querySelectorAll("#table-list a")
+          .forEach((a) => a.classList.remove("active"));
+        const active = document.querySelector(
+          `#table-list a[data-table="${tableName}"]`,
+        );
+        if (active) active.classList.add("active");
+      }
+
+      function showCRUDModal(action) {
+        if (!currentTable) {
+          showToast("Prvo izaberite tabelu.", "error");
+          return;
+        }
+        currentCRUDAction = action;
+        const title = document.getElementById("crudModalTitle");
+        const body = document.getElementById("crudModalBody");
+        const btn = document.getElementById("crudSubmitBtn");
+
+        if (action === "insert") {
+          title.textContent = "Dodaj novi red";
+          body.innerHTML = `<p class="small text-muted">Unesite vrednosti za kolone tabele <strong>${currentTable}</strong>.</p>
+            <div class="mb-3"><label class="form-label">Kolone (odvojene zarezom)</label><input class="form-control" id="crud-columns" placeholder="npr. ime, prezime, email"></div>
+            <div class="mb-3"><label class="form-label">Vrednosti (odvojene zarezom)</label><input class="form-control" id="crud-values" placeholder="npr. Marko, Marković, marko@email.com"></div>
+            <small class="text-warning">Napomena: ID i geom kolone se automatski generišu. Tekstualne vrednosti mogu biti bez navodnika.</small>`;
+          btn.textContent = "Dodaj";
+        } else if (action === "update") {
+          title.textContent = "Ažuriraj red";
+          body.innerHTML = `<p class="small text-muted">Ažuriranje tabele <strong>${currentTable}</strong>.</p>
+            <div class="mb-3"><label class="form-label">Kolona za ažuriranje</label><input class="form-control" id="crud-setcol" placeholder="npr. telefon"></div>
+            <div class="mb-3"><label class="form-label">Nova vrednost</label><input class="form-control" id="crud-newval" placeholder="+38166000000"></div>
+            <div class="mb-3"><label class="form-label">ID kolona (WHERE)</label><input class="form-control" id="crud-wherecol" placeholder="npr. id_vlasnika"></div>
+            <div class="mb-3"><label class="form-label">ID vrednost</label><input class="form-control" id="crud-whereval" placeholder="npr. 1"></div>`;
+          btn.textContent = "Ažuriraj";
+        } else {
+          title.textContent = "Obriši red";
+          body.innerHTML = `<div class="alert alert-danger">Brisanje reda iz tabele <strong>${currentTable}</strong>.</div>
+            <div class="mb-3"><label class="form-label">ID kolona (WHERE)</label><input class="form-control" id="crud-wherecol" placeholder="npr. id_vlasnika"></div>
+            <div class="mb-3"><label class="form-label">ID vrednost</label><input class="form-control" id="crud-whereval" placeholder="npr. 7"></div>`;
+          btn.textContent = "Obriši";
+        }
+
+        new bootstrap.Modal(document.getElementById("crudModal")).show();
+      }
+
+      async function executeCRUD() {
+        const action = currentCRUDAction;
+        const table = currentTable;
+        let payload = { action, table };
+
+        if (action === "insert") {
+          const cols = document.getElementById("crud-columns").value;
+          const vals = document.getElementById("crud-values").value;
+          payload.columns = cols.split(",").map((s) => s.trim());
+          payload.values = vals.split(",").map((s) => s.trim());
+        } else {
+          payload.set_column =
+            document.getElementById("crud-setcol")?.value || "";
+          payload.new_value =
+            document.getElementById("crud-newval")?.value || "";
+          payload.where_column = document.getElementById("crud-wherecol").value;
+          payload.where_value = document.getElementById("crud-whereval").value;
+        }
+
+        const data = await apiFetch("/api/crud", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        if (data && data.status === "ok") {
+          showToast(data.message);
+          bootstrap.Modal.getInstance(
+            document.getElementById("crudModal"),
+          ).hide();
+          await loadTableData(table);
+          await loadTableList();
+        }
+      }
+
+      // ======================== TAB 2: JOIN UPITI ========================
+      async function loadJoins() {
+        const data = await apiFetch("/api/joins");
+        if (!data) return;
+
+        const container = document.getElementById("join-results-container");
+        const joinNames = {
+          parcele_sa_zemljistem: "Parcele × Tipovi zemljišta (pH 6.0–7.5)",
+          usevi_vlasnici: "Usevi × Parcele × Vlasnici (aktivni)",
+          nadzor_niski_ndvi: "Nadzor × Usevi (NDVI < 0.75)",
+          parcele_katastar: "Parcele × KO × Usevi (Bačka)",
+          vlasnici_agregacija: "Vlasnici — agregacija (>3 ha)",
+          usevi_navodnjavanje: "Usevi × Zemljište × Vlasnici (navodnjavanje)",
+          nadzor_tretmani: "Nadzor × Usevi × Parcele × KO (sa tretmanima)",
+        };
+
+        let html = "";
+        for (const [key, rows] of Object.entries(data)) {
+          const title = joinNames[key] || key;
+          html += `<div class="col-md-6 mb-3"><div class="card"><div class="card-header bg-light"><strong>📊 ${title}</strong> <span class="badge bg-success ms-2">${rows.length} redova</span></div>`;
+          html += `<div class="table-container" style="max-height:250px;"><table class="table table-sm mb-0"><thead><tr>`;
+          if (rows.length > 0) {
+            for (const col of Object.keys(rows[0])) {
+              html += `<th>${col}</th>`;
+            }
+          }
+          html += `</tr></thead><tbody>`;
+          for (const row of rows) {
+            html += "<tr>";
+            for (const val of Object.values(row)) {
+              html += `<td>${val !== null ? val : ""}</td>`;
+            }
+            html += "</tr>";
+          }
+          html += `</tbody></table></div></div></div>`;
+        }
+        container.innerHTML = html;
+      }
+
+      // ======================== TAB 3: GIS & OVERLAY ========================
+      async function loadGISInfo() {
+        // Slojevi
+        const slojeviData = await apiFetch("/api/slojevi");
+        const sTable = document.querySelector("#slojevi-table tbody");
+        if (slojeviData) {
+          sTable.innerHTML = Object.entries(slojeviData)
+            .map(
+              ([name, info]) =>
+                `<tr><td><strong>${name}</strong></td><td>${info.count}</td><td>${(info.geom_types || []).join(", ")}</td><td>${info.crs}</td></tr>`,
+            )
+            .join("");
+        }
+
+        // Overlay analize
+        const overlayData = await apiFetch("/api/overlays");
+        const oTable = document.querySelector("#overlay-table tbody");
+        if (overlayData) {
+          oTable.innerHTML = Object.entries(overlayData)
+            .map(
+              ([name, info]) =>
+                `<tr><td>${name}</td><td><span class="badge bg-secondary">${info.count}</span></td></tr>`,
+            )
+            .join("");
+        }
+      }
+
+      // ======================== TAB 4: ML ========================
+      async function loadMLData() {
+        const data = await apiFetch("/api/ml/stats");
+        if (!data) return;
+
+        document.getElementById("stat-ml").textContent = data.total_count || 0;
+        document.getElementById("stat-crops").textContent = (
+          data.statistics || []
+        ).length;
+
+        // Statistike
+        const statsBody = document.querySelector("#ml-stats-table tbody");
+        if (data.statistics && data.statistics.length > 0) {
+          statsBody.innerHTML = data.statistics
+            .map(
+              (s) =>
+                `<tr><td><strong>${s.crop_type || ""}</strong></td>
+             <td>${s.broj || ""}</td><td>${s.prosecna_povrsina_ha || ""}</td>
+             <td>${s.prosecan_ndvi || ""}</td><td>${s.prosecna_pouzdanost || ""}</td>
+             <td>${s.ukupna_povrsina || ""}</td></tr>`,
+            )
+            .join("");
+        }
+
+        // Detekcije
+        const detBody = document.querySelector("#ml-detections-table tbody");
+        if (data.detections && data.detections.length > 0) {
+          const colorMap = {
+            Pšenica: "#F5DEB3",
+            Kukuruz: "#FFD700",
+            Suncokret: "#FFA500",
+            Soja: "#32CD32",
+            Ječam: "#DEB887",
+            Krompir: "#8B4513",
+          };
+          detBody.innerHTML = data.detections
+            .map(
+              (d, i) =>
+                `<tr>
+                <td>${i}</td>
+                <td><span class="crop-badge" style="background:${colorMap[d.crop_type] || "#999"};color:#000">${d.crop_type}</span></td>
+                <td>${d.confidence}</td><td>${d.ndvi_mean}</td>
+                <td>${d.lai_estimate}</td><td>${d.area_ha}</td>
+                <td>${d.temperature}</td><td>${d.humidity}</td>
+                <td>${d.latitude}</td><td>${d.longitude}</td>
+            </tr>`,
+            )
+            .join("");
+        }
+      }
+
+      function showMLUpdate() {
+        new bootstrap.Modal(document.getElementById("mlUpdateModal")).show();
+      }
+
+      async function updateMLDetection() {
+        const idx = parseInt(document.getElementById("ml-update-index").value);
+        const crop = document.getElementById("ml-update-crop").value;
+        const confidence = parseFloat(
+          document.getElementById("ml-update-confidence").value,
+        );
+        const ndvi = parseFloat(
+          document.getElementById("ml-update-ndvi").value,
+        );
+
+        const payload = {
+          index: idx,
+          attributes: { crop_type: crop, confidence, ndvi_mean: ndvi },
+        };
+
+        const data = await apiFetch("/api/ml/update", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        if (data && data.status === "ok") {
+          showToast(data.message);
+          bootstrap.Modal.getInstance(
+            document.getElementById("mlUpdateModal"),
+          ).hide();
+          await loadMLData();
+          // Osveži mapu
+          document.getElementById("map-iframe").src = "/map?" + Date.now();
+        }
+      }
+
+      // ======================== INIT ========================
+      document.addEventListener("DOMContentLoaded", () => {
+        refreshAll();
+        // Osveži mapu kada se tab otvori
+        document
+          .querySelector('button[data-bs-target="#tab-map"]')
+          .addEventListener("shown.bs.tab", () => {
+            document.getElementById("map-iframe").src = "/map?" + Date.now();
+          });
+      });
+    </script>
+  </body>
+</html>
