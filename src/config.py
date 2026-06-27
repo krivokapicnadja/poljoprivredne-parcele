@@ -2,15 +2,21 @@
 Centralna konfiguracija za aplikaciju Monitoring poljoprivrednih parcela.
 """
 
+from dotenv import load_dotenv
+import os
+
+
+
+load_dotenv()
 # PostgreSQL/PostGIS konekcioni parametri
 DB_CONFIG = {
-    "host": "localhost",
+    "host": os.getenv("DB_HOST"),
     "port": 5432,
-    "database": "poljoprivredne_parcele",
-    "user": "postgres",
-    "password": "postgres",
+    "database": "postgres",
+    "user": "postgres.awrrylgebnnjpwxzokmt",
+    "password": os.getenv("DB_PASSWORD"),
+    "sslmode": "require",
 }
-
 # Putanje do podataka
 DATA_DIR = "data"
 MODELS_DIR = "models"
