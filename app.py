@@ -295,7 +295,12 @@ def api_overlay_results():
     for naziv, gdf in CACHE.get("overlay_rezultati", {}).items():
         if gdf is not None and len(gdf) > 0:
             try:
-                rez = _df_to_dict(gdf.drop(columns=["geometry"], errors="ignore"))
+                #rez = _df_to_dict(gdf.drop(columns=["geometry"], errors="ignore"))
+                #novo:
+                gdf_clean = pd.DataFrame(gdf.drop(columns=[c for c in gdf.columns 
+                    if hasattr(gdf[c], 'geom_type') or c == 'geometry'], errors="ignore"))
+                rez = _df_to_dict(gdf_clean)
+
                 rezultati[naziv] = {"count": len(gdf), "data": rez[:5]}
             except Exception:
                 rezultati[naziv] = {"count": len(gdf), "data": []}
@@ -488,5 +493,5 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"[WARN] Inicijalizacija nije u potpunosti uspela: {e}")
         print("[INFO] Aplikacija će se pokrenuti. Kliknite 'Inicijalizuj bazu' u UI.")
-
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    #privremena izmena
+    app.run(debug=True, host="0.0.0.0", port=5000, use_reloader=False)
