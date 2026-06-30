@@ -18,6 +18,7 @@ data/*.shp
 data/*.shx
 data/*.dbf
 data/*.prj
+data/*.html
 
 # IDE
 #.vscode/
