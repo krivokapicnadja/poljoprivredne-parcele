@@ -12,6 +12,9 @@ Pokretanje:
   Zatim otvoriti http://localhost:5000 u pretraživaču.
 """
 
+import warnings
+warnings.filterwarnings("ignore")
+
 from app import app
 
 if __name__ == "__main__":
@@ -21,4 +24,4 @@ if __name__ == "__main__":
     print("=" * 70)
     print("\n  Pokrećem Flask server na http://localhost:5000")
     print("  Pritisnite Ctrl+C za zaustavljanje.\n")
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    app.run(debug=True, host="0.0.0.0", port=5000, use_reloader=False)

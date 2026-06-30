@@ -7,6 +7,9 @@ Integriše sva tri dela projekta:
   Deo 3 – ML: klasifikacija useva, vektorski izlaz, prostorne analize
 """
 
+import warnings
+warnings.filterwarnings("ignore")
+
 import os
 import json
 import sys
@@ -72,7 +75,11 @@ CACHE = {
 
 
 def _init_all_data():
-    """Inicijalizuje sve podatke i kešira ih."""
+    """Inicijalizuje sve podatke i kešira ih (samo jednom po pokretanju)."""
+    if CACHE.get("_initialized", False):
+        return
+    CACHE["_initialized"] = True
+    
     print("[INIT] Inicijalizacija svih podataka...")
 
     if CACHE["db_dataframes"] is None:
@@ -144,6 +151,7 @@ def _refresh_cache():
     """Osveži sve keširane podatke."""
     for key in CACHE:
         CACHE[key] = None
+    CACHE["_initialized"] = False
     _init_all_data()
 
 

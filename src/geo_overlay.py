@@ -27,23 +27,27 @@ def run_all_overlay_demos(slojevi):
     waterways = slojevi.get("waterways")
     natural = slojevi.get("natural")
 
+    MAX_SAMPLE = 500  # Ograničenje za overlay operacije nad velikim skupovima
+
     # ===== 1. BUFFER =====
     print("\n>>> 1. BUFFER: Kreiranje zaštitnog pojasa oko puteva (200m)")
     if roads is not None and len(roads) > 0:
-        # Konvertuj u projekciju sa metarskim jedinicama pre buffera
-        roads_utm = roads.to_crs("EPSG:32634")  # UTM zone 34N
+        # Uzmi uzorak za performanse
+        roads_sample = roads.iloc[:MAX_SAMPLE].copy()
+        roads_utm = roads_sample.to_crs("EPSG:32634")  # UTM zone 34N
         roads_utm["buffer_200m"] = roads_utm.geometry.buffer(200)
         roads_buf = roads_utm.set_geometry("buffer_200m").to_crs(CRS_WGS84)
         rezultati["buffer_putevi_200m"] = roads_buf
-        print(f"   Kreirano {len(roads_buf)} buffer zona oko puteva.")
+        print(f"   Kreirano {len(roads_buf)} buffer zona oko puteva (uzorak {MAX_SAMPLE}).")
 
-        # Buffer oko tačaka (silosi, objekti)
+        # Buffer oko objekata
         if buildings is not None and len(buildings) > 0:
-            bld_utm = buildings.to_crs("EPSG:32634")
+            bld_sample = buildings.iloc[:MAX_SAMPLE].copy()
+            bld_utm = bld_sample.to_crs("EPSG:32634")
             bld_utm["buffer_500m"] = bld_utm.geometry.buffer(500)
             bld_buf = bld_utm.set_geometry("buffer_500m").to_crs(CRS_WGS84)
             rezultati["buffer_objekti_500m"] = bld_buf
-            print(f"   Kreirano {len(bld_buf)} buffer zona oko objekata (500m).")
+            print(f"   Kreirano {len(bld_buf)} buffer zona oko objekata (500m, uzorak).")
     else:
         print("   Nema sloja puteva.")
 
@@ -122,57 +126,67 @@ def run_all_overlay_demos(slojevi):
 
     # ===== PROSTORNI UPITI =====
 
-    # 6. WITHIN (unutar)
-    print("\n>>> 6. Prostorni upit: Objekti (tačke) UNUTAR landuse poligona (WITHIN)")
+    # 6. WITHIN (unutar) - koristi uzorak za performanse
+    print("\n>>> 6. Prostorni upit: Objekti UNUTAR landuse poligona (WITHIN)")
     if buildings is not None and len(buildings) > 0:
-        landuse_union = landuse.unary_union
-        buildings["within_landuse"] = buildings.geometry.apply(
+        bld_sample = buildings.iloc[:MAX_SAMPLE].copy()
+        landuse_sample = landuse.iloc[:MAX_SAMPLE].copy()
+        landuse_union = landuse_sample.unary_union
+        bld_sample["within_landuse"] = bld_sample.geometry.apply(
             lambda g: g.within(landuse_union)
         )
-        within_count = buildings["within_landuse"].sum()
-        print(f"   {within_count}/{len(buildings)} objekata unutar landuse područja.")
-        rezultati["objekti_within_landuse"] = buildings[
-            buildings["within_landuse"]
+        within_count = bld_sample["within_landuse"].sum()
+        print(f"   {within_count}/{len(bld_sample)} objekata unutar landuse područja (uzorak {MAX_SAMPLE}).")
+        rezultati["objekti_within_landuse"] = bld_sample[
+            bld_sample["within_landuse"]
         ].copy()
 
-    # 7. INTERSECTS (seče)
+    # 7. INTERSECTS (seče) - uzorak za performanse
     print(
         "\n>>> 7. Prostorni upit: Parcele koje PRESECAJU prirodne oblasti (INTERSECTS)"
     )
     if natural is not None and len(natural) > 0:
+        landuse_sample = landuse.iloc[:MAX_SAMPLE].copy()
         intersects_list = []
-        for i, land_row in landuse.iterrows():
+        for i, land_row in landuse_sample.iterrows():
             for j, nat_row in natural.iterrows():
-                if land_row.geometry.intersects(nat_row.geometry):
-                    intersects_list.append(
-                        {
-                            "landuse_name": land_row.get("name", f"parcela_{i}"),
-                            "natural_name": nat_row.get("name", f"natural_{j}"),
-                            "geometry": land_row.geometry.intersection(
-                                nat_row.geometry
-                            ),
-                        }
-                    )
+                try:
+                    if land_row.geometry.intersects(nat_row.geometry):
+                        intersects_list.append(
+                            {
+                                "landuse_name": land_row.get("name", f"parcela_{i}"),
+                                "natural_name": nat_row.get("name", f"natural_{j}"),
+                                "geometry": land_row.geometry.intersection(
+                                    nat_row.geometry
+                                ),
+                            }
+                        )
+                except Exception:
+                    pass
         if intersects_list:
             intersects_gdf = gpd.GeoDataFrame(intersects_list, crs=CRS_WGS84)
             rezultati["intersects_landuse_natural"] = intersects_gdf
-            print(f"   Pronađeno {len(intersects_gdf)} preseka.")
+            print(f"   Pronađeno {len(intersects_gdf)} preseka (uzorak {MAX_SAMPLE} x {len(natural)}).")
         else:
             print("   Nema preseka.")
 
-    # 8. OVERLAPS (preklapanje)
+    # 8. OVERLAPS (preklapanje) - uzorak za performanse
     print("\n>>> 8. Prostorni upit: Landuse poligoni koji se PREKLAPAJU (OVERLAPS)")
+    SAMPLE_N = min(len(landuse), 200)
+    landuse_sample = landuse.iloc[:SAMPLE_N].copy()
     overlap_count = 0
     overlap_geoms = []
-    n = len(landuse)
-    for i in range(n):
-        for j in range(i + 1, n):
-            if landuse.iloc[i].geometry.overlaps(landuse.iloc[j].geometry):
-                overlap_count += 1
-                overlap_geoms.append(
-                    landuse.iloc[i].geometry.intersection(landuse.iloc[j].geometry)
-                )
-    print(f"   Broj preklapajućih landuse poligona: {overlap_count}")
+    for i in range(SAMPLE_N):
+        for j in range(i + 1, SAMPLE_N):
+            try:
+                if landuse_sample.iloc[i].geometry.overlaps(landuse_sample.iloc[j].geometry):
+                    overlap_count += 1
+                    overlap_geoms.append(
+                        landuse_sample.iloc[i].geometry.intersection(landuse_sample.iloc[j].geometry)
+                    )
+            except Exception:
+                pass
+    print(f"   Broj preklapajućih landuse poligona: {overlap_count} (uzorak {SAMPLE_N})")
     if overlap_geoms:
         rezultati["overlap_landuse"] = gpd.GeoDataFrame(
             {"type": ["overlap"] * len(overlap_geoms)},
@@ -180,7 +194,7 @@ def run_all_overlay_demos(slojevi):
             crs=CRS_WGS84,
         )
 
-    # 9. DISTANCE (blizina)
+    # 9. DISTANCE (blizina) - uzorak za performanse
     print("\n>>> 9. Prostorni upit: Udaljenost objekata od vodotokova (DISTANCE)")
     if (
         buildings is not None
@@ -188,7 +202,8 @@ def run_all_overlay_demos(slojevi):
         and len(buildings) > 0
         and len(waterways) > 0
     ):
-        bld_utm = buildings.to_crs("EPSG:32634")
+        bld_sample = buildings.iloc[:MAX_SAMPLE].copy()
+        bld_utm = bld_sample.to_crs("EPSG:32634")
         wat_utm = waterways.to_crs("EPSG:32634")
         wat_union = wat_utm.unary_union
         bld_utm["dist_do_vode_m"] = bld_utm.geometry.distance(wat_union)
@@ -197,7 +212,8 @@ def run_all_overlay_demos(slojevi):
         print(
             f"   Min: {bld_dist['dist_do_vode_m'].min():.0f}m, "
             f"Max: {bld_dist['dist_do_vode_m'].max():.0f}m, "
-            f"Mean: {bld_dist['dist_do_vode_m'].mean():.0f}m"
+            f"Mean: {bld_dist['dist_do_vode_m'].mean():.0f}m "
+            f"(uzorak {MAX_SAMPLE} objekata)"
         )
 
     print("\n[OK] Sve overlay i prostorne analize su završene.")

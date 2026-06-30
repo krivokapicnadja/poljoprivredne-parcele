@@ -67,30 +67,30 @@ def create_interactive_map(
         sloj_styles = {
             "landuse": {
                 "color": "#228B22",  # Tamno zelena
-                "fillOpacity": 0.4,
-                "weight": 1,
+                "fillOpacity": 0.35,
+                "weight": 0.5,
                 "name": "Poljoprivredne površine (Landuse)",
             },
             "buildings": {
-                "color": "#FF4500",  # Crvena
-                "icon": "home",
-                "prefix": "fa",
+                "color": "#B22222",  # Tamnocrvena (firebrick)
+                "fillOpacity": 0.5,
+                "weight": 0.5,
                 "name": "Objekti (Buildings)",
             },
             "roads": {
                 "color": "#FFD700",  # Zlatna
-                "weight": 3,
+                "weight": 2,
                 "name": "Putevi (Roads)",
             },
             "waterways": {
                 "color": "#1E90FF",  # Plava
-                "weight": 3,
+                "weight": 2,
                 "name": "Vodotokovi (Waterways)",
             },
             "natural": {
                 "color": "#32CD32",  # Svetlo zelena
                 "fillOpacity": 0.3,
-                "weight": 1,
+                "weight": 0.5,
                 "name": "Prirodne oblasti (Natural)",
             },
         }
@@ -102,23 +102,40 @@ def create_interactive_map(
 
             fg = FeatureGroup(name=style.get("name", naziv), show=True)
 
-            if naziv in ("landuse", "natural"):
-                # Poligonski sloj
+            # --- Poligonski slojevi (landuse, natural, buildings) ---
+            if naziv in ("landuse", "natural", "buildings"):
+                # Odredi koje tooltip kolone su dostupne
+                tooltip_fields = []
+                if "name" in gdf.columns:
+                    tooltip_fields.append("name")
+                if "type" in gdf.columns:
+                    tooltip_fields.append("type")
+                if "fclass" in gdf.columns and "type" not in gdf.columns:
+                    tooltip_fields.append("fclass")
+                if "category" in gdf.columns:
+                    tooltip_fields.append("category")
+
                 folium.GeoJson(
                     gdf.to_json(),
                     style_function=lambda feature, s=style: {
                         "color": s["color"],
                         "fillColor": s["color"],
                         "fillOpacity": s.get("fillOpacity", 0.3),
-                        "weight": s.get("weight", 1),
+                        "weight": s.get("weight", 0.5),
                     },
                     tooltip=folium.GeoJsonTooltip(
-                        fields=["name", "type"] if "name" in gdf.columns else ["type"],
+                        fields=tooltip_fields if tooltip_fields else None,
                     ),
                 ).add_to(fg)
 
+            # --- Linijski slojevi (roads, waterways) ---
             elif naziv in ("roads", "waterways"):
-                # Linijski sloj
+                tooltip_fields = []
+                if "name" in gdf.columns:
+                    tooltip_fields.append("name")
+                if "fclass" in gdf.columns:
+                    tooltip_fields.append("fclass")
+
                 folium.GeoJson(
                     gdf.to_json(),
                     style_function=lambda feature, s=style: {
@@ -126,35 +143,9 @@ def create_interactive_map(
                         "weight": s.get("weight", 2),
                     },
                     tooltip=folium.GeoJsonTooltip(
-                        fields=["name"] if "name" in gdf.columns else None,
+                        fields=tooltip_fields if tooltip_fields else None,
                     ),
                 ).add_to(fg)
-
-            elif naziv == "buildings":
-                # Tačkasti sloj
-                for _, row in gdf.iterrows():
-                    color_map = {
-                        "#FF0000": "red",
-                        "#3388FF": "blue",
-                        "#FF8C00": "orange",
-                        "#228B22": "darkgreen",
-                        "#800080": "purple",
-                        "#A52A2A": "darkred",
-                        "#006400": "darkgreen",
-                        "#0066CC": "darkblue",
-                        "#FFD700": "orange",
-                        "#808080": "gray",
-                    }
-                    raw_color = style.get("color", "red")
-                    icon_color = color_map.get(raw_color, "red")
-                    folium.Marker(
-                        location=[row.geometry.y, row.geometry.x],
-                        popup=f"{row.get('name', '')} ({row.get('type', '')})",
-                        icon=folium.Icon(
-                            color=icon_color,
-                            icon=style.get("icon", "info-sign"),
-                        ),
-                    ).add_to(fg)
 
             fg.add_to(m)
 

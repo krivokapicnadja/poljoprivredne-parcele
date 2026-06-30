@@ -723,7 +723,7 @@ def run_crud_demo():
         "fizicko_lice",
         "2025-01-10",
     ],
-    )
+)
     read_all("vlasnici")
 
     # UPDATE
