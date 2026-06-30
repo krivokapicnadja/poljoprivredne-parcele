@@ -168,72 +168,78 @@ def insert_initial_data():
 
     # 3. vlasnici (6 redova)
     vlasnici = [
-        (
-            "1234567890123",
-            "Milan",
-            "Petrović",
-            "Ulica 1, Novi Sad",
-            "+38164111222",
-            "milan@email.com",
-            "fizicko_lice",
-            "2020-01-15",
-            True,
-        ),
-        (
-            "2345678901234",
-            "Jelena",
-            "Jovanović",
-            "Ulica 2, Zrenjanin",
-            "+38164222333",
-            "jelena@email.com",
-            "fizicko_lice",
-            "2019-06-20",
-            True,
-        ),
-        (
-            "3456789012345",
-            "Agro Plus d.o.o.",
-            "",
-            "Ulica 3, Subotica",
-            "+38164333444",
-            "agro@email.com",
-            "pravno_lice",
-            "2018-03-10",
-            True,
-        ),
-        (
-            "4567890123456",
-            "Dragan",
-            "Marković",
-            "Ulica 4, Kragujevac",
-            "+38164444555",
-            "dragan@email.com",
-            "fizicko_lice",
-            "2021-09-01",
-            True,
-        ),
-        (
-            "5678901234567",
-            "Vesna",
-            "Nikolić",
-            "Ulica 5, Niš",
-            "+38164555666",
-            "vesna@email.com",
-            "fizicko_lice",
-            "2017-11-30",
-            True,
-        ),
-        (
-            "6789012345678",
-            "Zelena Farm d.o.o.",
-            "",
-            "Ulica 6, Čačak",
-            "+38164666777",
-            "zelena@email.com",
-            "pravno_lice",
-            "2016-05-15",
-            True,
-        ),
+    # 1. Milan Petrović - Sremska Mitrovica
+    (
+        "0101995123456",  # Validan JMBG: 01.01.1995.
+        "Milan",
+        "Petrović",
+        "Kralja Petra I 5, Sremska Mitrovica",  # ✅ Srem
+        "+38164111222",
+        "milan.petrovic@email.com",
+        "fizicko_lice",
+        "2020-01-15",
+        True,
+    ),
+    # 2. Jelena Jovanović - Ruma
+    (
+        "1503198765432",  # 15.03.1987.
+        "Jelena",
+        "Jovanović",
+        "Glavna 12, Ruma",  # ✅ Srem
+        "+38164222333",
+        "jelena.jovanovic@email.com",
+        "fizicko_lice",
+        "2019-06-20",
+        True,
+    ),
+    # 3. Agro Plus d.o.o. - Šid
+    (
+        "1234567890123",  # Za firme može ostati
+        "Agro Plus d.o.o.",
+        "",
+        "Industrijska zona bb, Šid",  # ✅ Srem
+        "+38164333444",
+        "agro.plus@email.com",
+        "pravno_lice",
+        "2018-03-10",
+        True,
+    ),
+    # 4. Dragan Marković - Stara Pazova
+    (
+        "0101199065432",  # 01.01.1990.
+        "Dragan",
+        "Marković",
+        "Partizanska 8, Stara Pazova",  # ✅ Srem
+        "+38164444555",
+        "dragan.markovic@email.com",
+        "fizicko_lice",
+        "2021-09-01",
+        True,
+    ),
+    # 5. Vesna Nikolić - Inđija
+    (
+        "0101198567890",  # 01.01.1985.
+        "Vesna",
+        "Nikolić",
+        "Svetog Save 3, Inđija",  # ✅ Srem
+        "+38164555666",
+        "vesna.nikolic@email.com",
+        "fizicko_lice",
+        "2017-11-30",
+        True,
+    ),
+    # 6. Zelena Farm d.o.o. - Irig
+    (
+        "0101197876543",  # Za firme može ostati
+        "Zelena Farm d.o.o.",
+        "",
+        "Fruškogorska bb, Irig",  # ✅ Srem
+        "+38164666777",
+        "zelena.farm@email.com",
+        "pravno_lice",
+        "2016-05-15",
+        True,
+    ),
     ]
     cur.executemany(
         """INSERT INTO vlasnici (jmbg, ime, prezime, adresa, telefon, email, tip_vlasnika, datum_registracije, aktivan)
@@ -268,56 +274,56 @@ def insert_initial_data():
         return wkb
 
     parcele = [
-    # 1. Sremska Mitrovica - pšenična polja
+    # 1. Sremska Mitrovica - pšenična polja → preklapa se sa landuse "Njiva Mitrovica 1"
     (
         "P-001",
         3.55,
-        create_bbox_polygon_wkt(19.62, 44.99),  # Ležimir - poznato vinogradarsko područje
+        create_bbox_polygon_wkt(19.61, 44.97),  # S. Mitrovica — unutar landuse poligona (19.60–19.64, 44.96–44.99)
         1, 1, 1,
         "Ležimir bb, Sremska Mitrovica",
         85, 1.5
     ),
-    # 2. Ruma - kukuruzna polja
+    # 2. Ruma - kukuruzna polja → preklapa se sa landuse "Njiva Ruma 1"
     (
         "P-002",
         5.20,
-        create_bbox_polygon_wkt(19.84, 45.02),  # Putinci - ratarsko područje
+        create_bbox_polygon_wkt(19.83, 44.99),  # Ruma — unutar landuse poligona (19.82–19.86, 44.98–45.01)
         2, 2, 2,
         "Putinci bb, Ruma",
         90, 0.8
     ),
-    # 3. Šid - suncokret
+    # 3. Šid - suncokret → preklapa se sa landuse "Njiva Šid 1"
     (
         "P-003",
         2.80,
-        create_bbox_polygon_wkt(19.25, 45.14),  # Adaševci - granično područje
+        create_bbox_polygon_wkt(19.11, 45.03),  # Šid — unutar landuse poligona (19.10–19.14, 45.02–45.05)
         3, 3, 3,
         "Adaševci bb, Šid",
         95, 2.0
     ),
-    # 4. Stara Pazova - soja
+    # 4. Stara Pazova - soja → preklapa se sa landuse "Njiva Stara Pazova"
     (
         "P-004",
         4.10,
-        create_bbox_polygon_wkt(20.22, 45.00),  # Nova Pazova - plodno zemljište
+        create_bbox_polygon_wkt(20.19, 44.99),  # Stara Pazova — unutar landuse poligona (20.18–20.22, 44.98–45.01)
         5, 4, 4,
         "Nova Pazova bb, Stara Pazova",
         80, 3.5
     ),
-    # 5. Inđija - ječam
+    # 5. Inđija - ječam → preklapa se sa landuse "Povrtnjak Inđija"
     (
         "P-005",
         6.75,
-        create_bbox_polygon_wkt(20.10, 45.06),  # Čortanovci - podno Fruške Gore
+        create_bbox_polygon_wkt(20.09, 45.05),  # Inđija — unutar landuse poligona (20.08–20.12, 45.04–45.07)
         4, 5, 1,
         "Čortanovci bb, Inđija",
         120, 1.2
     ),
-    # 6. Irig - krompir (Fruška Gora područje)
+    # 6. Irig - krompir (Fruška Gora područje) → preklapa se sa landuse "Voćnjak Irig"
     (
         "P-006",
         3.30,
-        create_bbox_polygon_wkt(19.86, 45.12),  # Velika Remeta - vinogradi i povrće
+        create_bbox_polygon_wkt(19.86, 45.13),  # Irig — unutar landuse poligona (19.85–19.88, 45.12–45.15)
         6, 6, 5,
         "Velika Remeta bb, Irig",
         180, 4.0
@@ -696,27 +702,27 @@ def run_crud_demo():
     # INSERT
     print("\n>>> Unos novog reda u vlasnici:")
     insert_row(
-        "vlasnici",
-        [
-            "jmbg",
-            "ime",
-            "prezime",
-            "adresa",
-            "telefon",
-            "email",
-            "tip_vlasnika",
-            "datum_registracije",
-        ],
-        [
-            "7890123456789",
-            "Zoran",
-            "Ilić",
-            "Ulica 7, Pančevo",
-            "+38164777888",
-            "zoran@email.com",
-            "fizicko_lice",
-            "2025-01-10",
-        ],
+    "vlasnici",
+    [
+        "jmbg",
+        "ime",
+        "prezime",
+        "adresa",
+        "telefon",
+        "email",
+        "tip_vlasnika",
+        "datum_registracije",
+    ],
+    [
+        "7890123456789",
+        "Zoran",
+        "Ilić",
+        "Sremska 15, Sremska Mitrovica",  # ✅ Srem
+        "+38164777888",
+        "zoran.ilic@email.com",
+        "fizicko_lice",
+        "2025-01-10",
+    ],
     )
     read_all("vlasnici")
 

@@ -46,7 +46,7 @@ CRS_WGS84 = "EPSG:4326"
 SREM_BOUNDS = {
     "west": 19.05,  # granica sa Hrvatskom (Šid)
     "east": 20.35,  # Stara Pazova / Zemun
-    "south": 44.80,  # Sava
+    "south": 44.73,  # Sava (Obedska bara)
     "north": 45.25,  # Dunav
 }
-SREM_CENTER = [45.03, 19.70]  # centar Srema (okvirno)
+SREM_CENTER = [44.99, 19.70]  # centar Srema (okvirno — između Rume i S. Mitrovice)
