@@ -268,73 +268,61 @@ def insert_initial_data():
         return wkb
 
     parcele = [
-        (
-            "P-001",
-            3.55,
-            create_bbox_polygon_wkt(19.85, 45.26),
-            1,
-            1,
-            1,
-            "Temerinski put bb, Novi Sad",
-            80,
-            1.5,
-        ),
-        (
-            "P-002",
-            5.20,
-            create_bbox_polygon_wkt(20.40, 45.38),
-            2,
-            2,
-            2,
-            "Mihajlovački put, Zrenjanin",
-            75,
-            0.8,
-        ),
-        (
-            "P-003",
-            2.80,
-            create_bbox_polygon_wkt(19.67, 46.10),
-            3,
-            3,
-            3,
-            "Kelebijski put, Subotica",
-            105,
-            2.0,
-        ),
-        (
-            "P-004",
-            4.10,
-            create_bbox_polygon_wkt(20.92, 44.02),
-            4,
-            4,
-            4,
-            "Kraljevački put, Kragujevac",
-            200,
-            3.5,
-        ),
-        (
-            "P-005",
-            6.75,
-            create_bbox_polygon_wkt(21.90, 43.32),
-            5,
-            5,
-            1,
-            "Niški put, Niš",
-            180,
-            1.2,
-        ),
-        (
-            "P-006",
-            3.30,
-            create_bbox_polygon_wkt(20.35, 43.89),
-            6,
-            6,
-            5,
-            "Ljubićki put, Čačak",
-            250,
-            4.0,
-        ),
-    ]
+    # 1. Sremska Mitrovica - pšenična polja
+    (
+        "P-001",
+        3.55,
+        create_bbox_polygon_wkt(19.62, 44.99),  # Ležimir - poznato vinogradarsko područje
+        1, 1, 1,
+        "Ležimir bb, Sremska Mitrovica",
+        85, 1.5
+    ),
+    # 2. Ruma - kukuruzna polja
+    (
+        "P-002",
+        5.20,
+        create_bbox_polygon_wkt(19.84, 45.02),  # Putinci - ratarsko područje
+        2, 2, 2,
+        "Putinci bb, Ruma",
+        90, 0.8
+    ),
+    # 3. Šid - suncokret
+    (
+        "P-003",
+        2.80,
+        create_bbox_polygon_wkt(19.25, 45.14),  # Adaševci - granično područje
+        3, 3, 3,
+        "Adaševci bb, Šid",
+        95, 2.0
+    ),
+    # 4. Stara Pazova - soja
+    (
+        "P-004",
+        4.10,
+        create_bbox_polygon_wkt(20.22, 45.00),  # Nova Pazova - plodno zemljište
+        5, 4, 4,
+        "Nova Pazova bb, Stara Pazova",
+        80, 3.5
+    ),
+    # 5. Inđija - ječam
+    (
+        "P-005",
+        6.75,
+        create_bbox_polygon_wkt(20.10, 45.06),  # Čortanovci - podno Fruške Gore
+        4, 5, 1,
+        "Čortanovci bb, Inđija",
+        120, 1.2
+    ),
+    # 6. Irig - krompir (Fruška Gora područje)
+    (
+        "P-006",
+        3.30,
+        create_bbox_polygon_wkt(19.86, 45.12),  # Velika Remeta - vinogradi i povrće
+        6, 6, 5,
+        "Velika Remeta bb, Irig",
+        180, 4.0
+    ),
+]
     for p in parcele:
         cur.execute(
             """INSERT INTO parcele (broj_parcele, povrsina_ha, geom, id_kat_opstina, id_vlasnika, id_tip_zemljista, adresa_parcele, nadmorska_visina, nagib_terena_pct)
