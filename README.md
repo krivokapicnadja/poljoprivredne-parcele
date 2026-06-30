@@ -29,8 +29,8 @@ Aplikacija za evidenciju i analizu poljoprivrednih površina na području Srema,
 Sistem objedinjuje tri celine u jedinstvenu web aplikaciju:
 
 - **Bazu podataka (PostgreSQL/PostGIS)** — upravljanje parcelama, usevima, vlasnicima i prinosima kroz CRUD operacije i složene SQL upite.
-- **GIS prostorne analize** — rad sa vektorskim slojevima (shapefile), NDVI rasterskom podlogom, overlay tehnike i mapiranje rezultata.
-- **Mašinsko učenje** — klasifikacija useva Random Forest klasifikatorom, detekcija objekata na rasterskoj površini i prostorna analiza detekcija.
+- **GIS prostorne analize** — rad sa vektorskim slojevima (shapefile), stvarnim Sentinel‑2 NDVI rasterskim podacima sa Google Earth Engine‑a, overlay tehnike i mapiranje rezultata.
+- **Mašinsko učenje** — klasifikacija useva Random Forest klasifikatorom na **stvarnim Sentinel‑2 satelitskim snimcima** (preko GEE), sa ERA5 meteorološkim podacima, detekcija objekata i prostorna analiza detekcija.
 
 Flask web interfejs omogućava interaktivni pregled podataka, CRUD operacije, vizuelizaciju mapa i API pristup svim komponentama sistema.
 
@@ -41,21 +41,21 @@ Flask web interfejs omogućava interaktivni pregled podataka, CRUD operacije, vi
 ```
 ogi_projekat/
 ├── src/
-│   ├── config.py              # Konfiguracija: DB konekcija, putanje, CRS konstante, granice Srema
+│   ├── config.py              # Konfiguracija: DB konekcija, putanje, CRS konstante, granice Srema, GEE podešavanja
 │   ├── db_setup.py            # Deo 1: Kreiranje tabela, PK/FK, INSERT podataka
 │   ├── db_crud_queries.py     # Deo 1: CRUD operacije + 10 JOIN upita sa WHERE/HAVING
-│   ├── geo_loader.py          # Deo 2: Učitavanje SHP podataka, NDVI DEMO raster
+│   ├── geo_loader.py          # Deo 2: Učitavanje SHP podataka, stvarni Sentinel‑2 NDVI sa GEE‑a
 │   ├── geo_overlay.py         # Deo 2: 9 overlay tehnika i prostornih upita
 │   ├── map_viewer.py          # Deo 2: Interaktivna Folium mapa sa LayerControl, NDVI, simbologijom
-│   └── ml_crop_detector.py    # Deo 3: RandomForest klasifikacija, detekcija, CRUD atributa
+│   └── ml_crop_detector.py    # Deo 3: RandomForest klasifikacija na stvarnim Sentinel‑2 podacima (GEE)
 │
 ├── app.py                     # Flask web aplikacija (dashboard, API endpoint‑i)
 ├── main.py                    # Glavni orkestrator — pokreće ceo pipeline iz komandne linije
 ├── templates/
 │   └── index.html             # HTML/JS frontend — interaktivni dashboard
-├── static/                    # Statički resursi za Flask (CSS, JS, slike)
 ├── data/                      # Generisani podaci (raster, HTML mapa)
 ├── models/                    # Sačuvani ML modeli (pickle)
+├── .env                       # Promenljive okruženja (DB konekcija, GEE projekat)
 ├── pyproject.toml             # Zavisnosti i metapodaci projekta
 ├── .gitignore
 ├── .python-version
@@ -66,17 +66,19 @@ ogi_projekat/
 
 ## Tehnologije
 
-| Sloj            | Biblioteka                              |
-| --------------- | --------------------------------------- |
-| Baza podataka   | PostgreSQL / PostGIS, `psycopg2-binary` |
-| Web server      | `Flask`                                 |
-| Obrada podataka | `pandas`                                |
-| GIS / Vektori   | `geopandas`, `shapely`, `fiona`         |
-| Raster          | `rasterio`                              |
-| Vizuelizacija   | `folium`, `branca`, `matplotlib`        |
-| Mašinsko učenje | `scikit-learn` (RandomForest)           |
-| Serijalizacija  | `pickle`, `json`                        |
-| Numerika        | `numpy`                                 |
+| Sloj                | Biblioteka                                            |
+| ------------------- | ----------------------------------------------------- |
+| Baza podataka       | PostgreSQL / PostGIS, `psycopg2-binary`               |
+| Web server          | `Flask`                                               |
+| Obrada podataka     | `pandas`                                              |
+| GIS / Vektori       | `geopandas`, `shapely`, `fiona`                       |
+| Raster              | `rasterio`                                            |
+| Satelitski snimci   | `earthengine-api` (Google Earth Engine, Sentinel‑2)   |
+| Vizuelizacija       | `folium`, `branca`, `matplotlib`                      |
+| Mašinsko učenje     | `scikit-learn` (RandomForest)                         |
+| Serijalizacija      | `pickle`, `json`                                      |
+| Numerika            | `numpy`                                               |
+| Autentifikacija     | `google-auth`, `google-api-python-client`             |
 
 ---
 
@@ -106,7 +108,28 @@ python -m pip install -e .
 
 Sve zavisnosti su definisane u `pyproject.toml`. Opciono, možeš ih instalirati i pojedinačno ručno.
 
-> **Napomena:** Za punu funkcionalnost potrebna je lokalna PostgreSQL baza sa PostGIS ekstenzijom. Ako baza nije dostupna, sistem automatski radi u **demo režimu** sa simuliranim podacima.
+### 3.1 Podešavanje Google Earth Engine‑a
+
+Da bi ML koristio **stvarne Sentinel‑2 satelitske snimke**, potrebno je podesiti GEE:
+
+```bash
+# 1. Instaliraj GEE paket (ako već nije instaliran)
+python -m pip install earthengine-api
+
+# 2. Autentifikuj se (otvara browser za Google login)
+python -c "import ee; ee.Authenticate()"
+```
+
+Zatim kreiraj Google Cloud projekat, omogući **Earth Engine API** i registruj projekat za Earth Engine. Upiši Project ID u `.env`:
+
+```ini
+# .env
+DB_PASSWORD = tvoja_sifra
+DB_HOST = tvoj_host
+GEE_PROJECT = tvoj-gee-projekt-id
+```
+
+> **Napomena:** Ako GEE nije podešen, sistem automatski pada nazad na **simulirane podatke** za ML i demo NDVI raster. Za punu funkcionalnost potrebna je i PostgreSQL baza sa PostGIS ekstenzijom.
 
 ### 4. Pokreni aplikaciju
 
@@ -171,9 +194,9 @@ Flask aplikacija (`app.py`) pruža:
 
 ### Deo 2 – Python GEO (`geo_loader.py`, `geo_overlay.py`, `map_viewer.py`)
 
-- Učitavanje SHP slojeva sa **Geofabrik‑a** za područje Srbije (demo geopodaci ako fajlovi nisu prisutni)
-- Geopandas `GeoDataFrame` sa prostornim podacima
-- NDVI **raster** (.tif) kreiran sa `rasterio`
+- Učitavanje SHP slojeva sa **Geofabrik‑a** za područje Srema (filtrirano po granicama regiona)
+- Geopandas `GeoDataFrame` sa prostornim podacima, obogaćeni kategorijama
+- NDVI **raster** (.tif) — **stvarni Sentinel‑2** sa Google Earth Engine‑a (medijan kompozit, april–septembar, <20% oblaka), ili demo fallback
 - **9 prostornih analiza**:
 
   | Tehnika        | Opis                                               |
@@ -198,14 +221,15 @@ Flask aplikacija (`app.py`) pruža:
 
 ### Deo 3 – Python ML (`ml_crop_detector.py`)
 
-- **Random Forest klasifikator** sa 100 stabala
+- **Random Forest klasifikator** sa 150 stabala, max depth 12
 - 6 klasa useva: _Ječam, Krompir, Kukuruz, Pšenica, Soja, Suncokret_
-- Feature inženjering: NDVI, SAVI, NDWI, red band, NIR band, temperatura, vlažnost
-- **Trening**: 500 simuliranih uzoraka, 80/20 train‑test podela
+- Feature inženjering: NDVI, SAVI, NDWI, red band (B4), NIR band (B8), SWIR (B11), temperatura, vlažnost
+- **Trening na stvarnim podacima**: 500 piksela ekstrahovanih sa Sentinel‑2 snimaka putem GEE‑a, ERA5 meteorološki podaci (temperatura, precipitacija), heurističke oznake useva
+- **Fallback**: simulirani trening podaci kada GEE nije dostupan
 - Evaluacija: accuracy, precision, recall, f1‑score, feature importance
-- **Detekcija**: 25 objekata nad demo rasterskom površinom
+- **Detekcija**: 200 objekata nad stvarnim Sentinel‑2 mozaikom (GEE), ili 25 simuliranih objekata
 - **CRUD nad atributima** detekcije: izmena `crop_type`, `confidence`, `area_ha`, NDVI srednje vrednosti
-- Detektovani objekti u `GeoDataFrame` sa Point geometrijom → spremni za PostGIS INSERT
+- Detektovani objekti u `GeoDataFrame` sa Polygon geometrijom → spremni za PostGIS INSERT
 - Model i enkoderi sačuvani u `models/` (pickle)
 
 ---
@@ -244,30 +268,34 @@ POST /api/crud
 
 ## Primeri izlaza
 
-### Tačnost ML modela
+### Tačnost ML modela (stvarni Sentinel‑2 podaci)
 
 ```
-Tačnost modela: 0.62 (62.00%)
+=== EKSTRAKCIJA STVARNIH TRENING PODATAKA SA EARTH ENGINE-A ===
+   Broj Sentinel-2 snimaka: 184
+   Ekstrahovano 500 validnih piksela.
+   Dodati ERA5 meteorološki podaci.
+
+Tačnost modela: 0.9400 (94.00%)
 
 Značaj karakteristika:
-  red_band:    0.20
-  humidity:    0.18
-  nir_band:    0.17
-  temperature: 0.15
-  ndvi:        0.11
-  savi:        0.11
-  ndwi:        0.08
+  ndvi:         0.3337
+  savi:         0.2777
+  ndwi:         0.1924
+  red_band:     0.1150
+  nir_band:     0.0638
+  temperature:  0.0174
+  humidity:     0.0000
 ```
 
-### Detekcija useva (distribucija)
+### Detekcija useva (distribucija, stvarni snimci)
 
 ```
-Ječam:      9
-Kukuruz:    6
-Suncokret:  5
-Pšenica:    2
-Krompir:    2
-Soja:       1
+[OK] Detektovano 200 objekata sa stvarnih Sentinel-2 snimaka.
+
+Suncokret:  135
+Kukuruz:    49
+Soja:       16
 ```
 
 ### Prostorne analize
@@ -285,8 +313,8 @@ udaljenost od voda:      min 1825m, max 33552m, mean 11792m
 
 ## Planirana unapređenja
 
-- [ ] Povezivanje sa stvarnom PostgreSQL/PostGIS instancom (trenutno demo režim bez aktivne baze)
-- [ ] Preuzimanje stvarnih Sentinel‑2 snimaka sa Copernicus‑a
+- [x] Povezivanje sa stvarnom PostgreSQL/PostGIS instancom (Supabase)
+- [x] Preuzimanje stvarnih Sentinel‑2 snimaka sa Google Earth Engine‑a
 - [ ] Deep learning model (CNN) za precizniju klasifikaciju useva
 - [ ] Proširenje web interfejsa (vizuelizacija vremenskih serija, grafikoni prinosa)
 - [ ] Docker kontejnerizacija za lako postavljanje
