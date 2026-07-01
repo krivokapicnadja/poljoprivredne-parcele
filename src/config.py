@@ -46,7 +46,7 @@ GEE_KEY_FILE = os.getenv("GEE_KEY_FILE", "")
 SENTINEL_START_DATE = "2025-04-01"
 SENTINEL_END_DATE = "2025-09-30"
 SENTINEL_CLOUD_COVER = 20
-GEE_SCALE = 10  # metara po pikselu (Sentinel-2 rezolucija)
+GEE_SCALE = 30  # metara po pikselu (Sentinel-2 rezolucija)
 
 # Koordinatni referentni sistem Srbije
 CRS_SERBIA = "EPSG:6316"  # ETRS89 / UTM zone 34N

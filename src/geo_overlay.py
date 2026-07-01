@@ -33,7 +33,7 @@ def run_all_overlay_demos(slojevi):
     print("\n>>> 1. BUFFER: Kreiranje zaštitnog pojasa oko puteva (200m)")
     if roads is not None and len(roads) > 0:
         # Uzmi uzorak za performanse
-        roads_sample = roads.iloc[:MAX_SAMPLE].copy()
+        roads_sample = roads.sample(n=min(len(roads), MAX_SAMPLE), random_state=42)
         roads_utm = roads_sample.to_crs("EPSG:32634")  # UTM zone 34N
         roads_utm["buffer_200m"] = roads_utm.geometry.buffer(200)
         roads_buf = roads_utm.set_geometry("buffer_200m").to_crs(CRS_WGS84)
@@ -42,7 +42,7 @@ def run_all_overlay_demos(slojevi):
 
         # Buffer oko objekata
         if buildings is not None and len(buildings) > 0:
-            bld_sample = buildings.iloc[:MAX_SAMPLE].copy()
+            bld_sample = buildings.sample(n=min(len(buildings), MAX_SAMPLE), random_state=42)
             bld_utm = bld_sample.to_crs("EPSG:32634")
             bld_utm["buffer_500m"] = bld_utm.geometry.buffer(500)
             bld_buf = bld_utm.set_geometry("buffer_500m").to_crs(CRS_WGS84)
@@ -129,8 +129,8 @@ def run_all_overlay_demos(slojevi):
     # 6. WITHIN (unutar) - koristi uzorak za performanse
     print("\n>>> 6. Prostorni upit: Objekti UNUTAR landuse poligona (WITHIN)")
     if buildings is not None and len(buildings) > 0:
-        bld_sample = buildings.iloc[:MAX_SAMPLE].copy()
-        landuse_sample = landuse.iloc[:MAX_SAMPLE].copy()
+        bld_sample = buildings.sample(n=min(len(buildings), MAX_SAMPLE), random_state=42)
+        landuse_sample = landuse.sample(n=min(len(landuse), MAX_SAMPLE), random_state=42)
         landuse_union = landuse_sample.unary_union
         bld_sample["within_landuse"] = bld_sample.geometry.apply(
             lambda g: g.within(landuse_union)
@@ -146,7 +146,7 @@ def run_all_overlay_demos(slojevi):
         "\n>>> 7. Prostorni upit: Parcele koje PRESECAJU prirodne oblasti (INTERSECTS)"
     )
     if natural is not None and len(natural) > 0:
-        landuse_sample = landuse.iloc[:MAX_SAMPLE].copy()
+        landuse_sample = landuse.sample(n=min(len(landuse), MAX_SAMPLE), random_state=42)
         intersects_list = []
         for i, land_row in landuse_sample.iterrows():
             for j, nat_row in natural.iterrows():
@@ -173,7 +173,7 @@ def run_all_overlay_demos(slojevi):
     # 8. OVERLAPS (preklapanje) - uzorak za performanse
     print("\n>>> 8. Prostorni upit: Landuse poligoni koji se PREKLAPAJU (OVERLAPS)")
     SAMPLE_N = min(len(landuse), 200)
-    landuse_sample = landuse.iloc[:SAMPLE_N].copy()
+    landuse_sample = landuse.sample(n=SAMPLE_N, random_state=42).reset_index(drop=True)
     overlap_count = 0
     overlap_geoms = []
     for i in range(SAMPLE_N):
@@ -202,7 +202,7 @@ def run_all_overlay_demos(slojevi):
         and len(buildings) > 0
         and len(waterways) > 0
     ):
-        bld_sample = buildings.iloc[:MAX_SAMPLE].copy()
+        bld_sample = buildings.sample(n=min(len(buildings), MAX_SAMPLE), random_state=42)
         bld_utm = bld_sample.to_crs("EPSG:32634")
         wat_utm = waterways.to_crs("EPSG:32634")
         wat_union = wat_utm.unary_union

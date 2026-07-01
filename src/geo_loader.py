@@ -8,6 +8,7 @@ import os
 import numpy as np
 import geopandas as gpd
 import pandas as pd
+import urllib.request
 from shapely.geometry import box
 from src.config import (
     SHP_PATHS,
@@ -322,9 +323,10 @@ def create_ndvi_raster():
             ndvi = image.normalizedDifference(["B8", "B4"]).rename("NDVI")
             return image.addBands(ndvi)
 
-        # Mozaik — medijan svih snimaka (bez oblaka)
-        s2_with_ndvi = s2_collection.map(add_ndvi)
-        ndvi_composite = s2_with_ndvi.select("NDVI").median()
+        # Uzmi samo najmanje oblačan snimak iz perioda (jeftinije računski od medijane 184 snimka)
+        s2_collection_sorted = s2_collection.sort("CLOUDY_PIXEL_PERCENTAGE")
+        best_image = ee.Image(s2_collection_sorted.first())
+        ndvi_composite = add_ndvi(best_image).select("NDVI")
 
         # Klipuj na validan opseg
         ndvi_composite = ndvi_composite.clamp(-1.0, 1.0)
@@ -353,10 +355,68 @@ def create_ndvi_raster():
 
         return rastername
 
+    except urllib.error.HTTPError as e:
+        try:
+            error_body = e.read().decode()
+        except Exception:
+            error_body = "(ne mogu da pročitam telo odgovora)"
+        print(f"[WARN] HTTP greška {e.code} pri preuzimanju: {error_body}")
+        print("[INFO] Pada se nazad na demo NDVI raster.")
+        return _create_demo_ndvi_raster()
     except Exception as e:
         print(f"[WARN] Greška pri preuzimanju sa Earth Engine-a: {e}")
         print("[INFO] Pada se nazad na demo NDVI raster.")
         return _create_demo_ndvi_raster()
+    
+# NOVO - ISPRAVAK GRESKE IZ TERMINALA
+def get_ndvi_tile_url():
+    """
+    Vraća tile URL za NDVI sloj preko Earth Engine getMapId(),
+    bez preuzimanja rastera na disk. Koristi se za prikaz na Folium mapi.
+    Nema limit veličine jer se tajlovi učitavaju uživo, po zahtevu.
+    """
+    ee = _init_earth_engine()
+    if ee is None:
+        return None
+
+    try:
+        srem_region = ee.Geometry.Rectangle([
+            SREM_BOUNDS["west"],
+            SREM_BOUNDS["south"],
+            SREM_BOUNDS["east"],
+            SREM_BOUNDS["north"],
+        ])
+
+        s2_collection = (
+            ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED")
+            .filterBounds(srem_region)
+            .filterDate(SENTINEL_START_DATE, SENTINEL_END_DATE)
+            .filter(ee.Filter.lt("CLOUDY_PIXEL_PERCENTAGE", SENTINEL_CLOUD_COVER))
+        )
+
+        if s2_collection.size().getInfo() == 0:
+            return None
+
+        def add_ndvi(image):
+            ndvi = image.normalizedDifference(["B8", "B4"]).rename("NDVI")
+            return image.addBands(ndvi)
+
+        ndvi_composite = (
+            s2_collection.map(add_ndvi).select("NDVI").median().clamp(-1.0, 1.0)
+        )
+
+        map_id_dict = ndvi_composite.getMapId({
+            "min": -1,
+            "max": 1,
+            "palette": ["blue", "white", "green"],
+        })
+
+        print("[OK] NDVI tile URL dobijen preko Earth Engine getMapId().")
+        return map_id_dict["tile_fetcher"].url_format
+
+    except Exception as e:
+        print(f"[WARN] Ne mogu da dobijem NDVI tile URL: {e}")
+        return None
 
 
 # Alias za kompatibilnost sa starim kodom

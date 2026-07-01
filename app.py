@@ -42,6 +42,7 @@ from src.geo_loader import (
     load_serbia_shapefiles,
     merge_shp_with_db,
     create_ndvi_demo_raster,
+    get_ndvi_tile_url
 )
 from src.geo_overlay import run_all_overlay_demos, summarize_overlay_results
 from src.map_viewer import create_interactive_map
@@ -132,12 +133,14 @@ def _init_all_data():
             CACHE["join_results"] = {}
 
     # Generiši interaktivnu mapu
+    ndvi_tile_url = get_ndvi_tile_url()
     try:
         create_interactive_map(
             slojevi=CACHE["slojevi"],
             overlay_rezultati=CACHE["overlay_rezultati"],
             ml_vektor=CACHE["ml_gdf"],
             raster_path=CACHE["raster_path"],
+            ndvi_tile_url=ndvi_tile_url,
             output_file="data/interactive_map.html",
         )
         print("[OK] Mapa je regenerisana.")
@@ -391,11 +394,13 @@ def api_ml_update():
             print(f"[WARN] Ažuriranje PostGIS nije uspelo: {e}")
 
         # Regeneriši mapu
+        ndvi_tile_url = get_ndvi_tile_url()
         create_interactive_map(
             slojevi=CACHE["slojevi"],
             overlay_rezultati=CACHE["overlay_rezultati"],
             ml_vektor=CACHE["ml_gdf"],
             raster_path=CACHE["raster_path"],
+            ndvi_tile_url=ndvi_tile_url,
             output_file="data/interactive_map.html",
         )
 

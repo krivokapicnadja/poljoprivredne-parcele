@@ -16,6 +16,7 @@ def create_interactive_map(
     overlay_rezultati=None,
     ml_vektor=None,
     raster_path=None,
+    ndvi_tile_url=None,
     output_file="data/interactive_map.html",
 ):
     """
@@ -27,10 +28,22 @@ def create_interactive_map(
     """
 
     # Centar mape: Srem
-    m = folium.Map(location=SREM_CENTER, zoom_start=10, tiles="CartoDB positron")
+    m = folium.Map(location=SREM_CENTER, zoom_start=10, tiles="CartoDB positron", prefer_canvas=True)
 
     # ==== RASTER PODLOGA (NDVI) ====
-    if raster_path and os.path.exists(raster_path):
+    if ndvi_tile_url:
+        try:
+            folium.raster_layers.TileLayer(
+                tiles=ndvi_tile_url,
+                attr="Google Earth Engine",
+                name="NDVI Sentinel-2 (live)",
+                overlay=True,
+                control=True,
+            ).add_to(m)
+            print("[OK] NDVI tile sloj dodat na mapu.")
+        except Exception as e:
+            print(f"[WARN] NDVI tile sloj nije dodat: {e}")
+    elif raster_path and os.path.exists(raster_path):
         try:
             import rasterio
             import numpy as np
@@ -39,25 +52,18 @@ def create_interactive_map(
             with rasterio.open(raster_path) as src:
                 bounds = transform_bounds(src.crs, CRS_WGS84, *src.bounds)
                 ndvi = src.read(1)
-                # Normalizuj za prikaz
                 ndvi_normalized = np.clip(ndvi, 0, 1)
 
-                # Kreiraj overlay sliku kao PNG
-                from io import BytesIO
-                import base64
-                from matplotlib import cm
-
-                # Jednostavan prikaz bez PIL (koristi folium image overlay sa colormap)
                 ndvi_overlay = folium.raster_layers.ImageOverlay(
                     image=ndvi_normalized,
                     bounds=[[bounds[1], bounds[0]], [bounds[3], bounds[2]]],
                     colormap=lambda x: (0, int(x * 255), 0, 1),
-                    name="NDVI Raster",
+                    name="NDVI Raster (demo)",
                     overlay=True,
                     control=True,
                 )
                 ndvi_overlay.add_to(m)
-                print("[OK] NDVI raster dodat na mapu.")
+                print("[OK] NDVI demo raster dodat na mapu.")
         except Exception as e:
             print(f"[WARN] Raster nije učitan: {e}. Koristi se samo vektorska podloga.")
 
@@ -101,6 +107,27 @@ def create_interactive_map(
             )
 
             fg = FeatureGroup(name=style.get("name", naziv), show=True)
+
+            # --- Ograniči broj objekata po sloju (performanse browsera i veličina HTML-a) ---
+            MAX_FEATURES = {
+                "buildings": 15000,     # 349,591 ukupno 
+                "landuse": 20000,       # 29,140 ukupno 
+                "roads": 15000,         # 57,669 ukupno 
+                "waterways": 2322,      # sve
+                "natural": 18,          # sve
+            }
+            limit = MAX_FEATURES.get(naziv, 5000)
+
+            if len(gdf) > limit:
+                gdf = gdf.sample(n=limit, random_state=42)
+                print(f"   [INFO] Sloj '{naziv}' skraćen na {limit} od originalnih elemenata (uzorak).")
+            
+            # --- Pojednostavi geometriju da smanjimo veličinu HTML-a ---
+            # IZMENA - lets go with this
+            # manje detalja za predstvaljanje buildings na mapi
+            tolerance = 0.00005 if naziv == "buildings" else 0.0001
+            gdf = gdf.copy()
+            gdf["geometry"] = gdf["geometry"].simplify(tolerance, preserve_topology=True)
 
             # --- Poligonski slojevi (landuse, natural, buildings) ---
             if naziv in ("landuse", "natural", "buildings"):
