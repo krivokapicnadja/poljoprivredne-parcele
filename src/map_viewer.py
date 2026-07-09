@@ -110,9 +110,9 @@ def create_interactive_map(
 
             # --- Ograniči broj objekata po sloju (performanse browsera i veličina HTML-a) ---
             MAX_FEATURES = {
-                "buildings": 15000,     # 349,591 ukupno 
-                "landuse": 20000,       # 29,140 ukupno 
-                "roads": 15000,         # 57,669 ukupno 
+                "buildings": 8000,     # 349,591 ukupno 
+                "landuse": 29140,       # 29,140 ukupno 
+                "roads": 8000,         # 57,669 ukupno 
                 "waterways": 2322,      # sve
                 "natural": 18,          # sve
             }
@@ -191,11 +191,23 @@ def create_interactive_map(
             "objekti_within_landuse": "#FF69B4",
         }
 
+        # Slojevi koji se odmah prikazuju kad se mapa otvori (glavni analitički
+        # rezultati sa najviše podataka). Ostali ostaju dostupni u LayerControl-u,
+        # samo isprva isključeni da mapa ne bude prenatrpana.
+        DEFAULT_VISIBLE = {
+            "buffer_putevi_200m",
+            "clip_landuse_putevi",
+            "intersection_landuse_putevi",
+            "difference_landuse_van_putevi",
+        }
+
         for naziv, gdf in overlay_rezultati.items():
             if len(gdf) == 0:
                 continue
             col = overlay_colors.get(naziv, "#999")
-            fg = FeatureGroup(name=f"Analiza: {naziv}", show=False)
+            fg = FeatureGroup(
+                name=f"Analiza: {naziv}", show=(naziv in DEFAULT_VISIBLE)
+            )
             try:
                 folium.GeoJson(
                     gdf.to_json(),
@@ -207,8 +219,8 @@ def create_interactive_map(
                     },
                 ).add_to(fg)
                 fg.add_to(m)
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[WARN] Overlay sloj '{naziv}' nije dodat na mapu: {e}")
 
     # ==== ML DETEKTOVANI OBJEKTI ====
     if ml_vektor is not None and len(ml_vektor) > 0:

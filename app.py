@@ -13,6 +13,7 @@ warnings.filterwarnings("ignore")
 import os
 import json
 import sys
+import threading
 import pandas as pd
 import geopandas as gpd
 from flask import (
@@ -69,6 +70,10 @@ CACHE = {
     "join_results": None,
 }
 
+# Sprečava da dve paralelne request-nitke istovremeno rade (sporu) inicijalizaciju
+# i, još važnije, sprečava da neka ruta pročita CACHE dok je još napola popunjen.
+_init_lock = threading.Lock()
+
 
 # =============================================================
 # POMOĆNE FUNKCIJE
@@ -79,75 +84,86 @@ def _init_all_data():
     """Inicijalizuje sve podatke i kešira ih (samo jednom po pokretanju)."""
     if CACHE.get("_initialized", False):
         return
-    CACHE["_initialized"] = True
-    
-    print("[INIT] Inicijalizacija svih podataka...")
 
-    if CACHE["db_dataframes"] is None:
-        try:
-            CACHE["db_dataframes"] = load_all_to_dataframes()
-            print("[OK] Podaci učitani iz baze.")
-        except Exception as e:
-            print(f"[WARN] Baza nije dostupna ({e}). Aplikacija radi u demo režimu.")
-            CACHE["db_dataframes"] = {}
+    with _init_lock:
+        # Neka druga nit je možda već završila inicijalizaciju dok smo
+        # čekali na lock — u tom slučaju nema potrebe da radimo ponovo.
+        if CACHE.get("_initialized", False):
+            return
 
-    if CACHE["slojevi"] is None:
-        CACHE["slojevi"] = load_serbia_shapefiles()
-        if CACHE["db_dataframes"]:
+        print("[INIT] Inicijalizacija svih podataka...")
+
+        if CACHE["db_dataframes"] is None:
             try:
-                CACHE["merged_df"] = merge_shp_with_db(
-                    CACHE["slojevi"], CACHE["db_dataframes"]
-                )
+                CACHE["db_dataframes"] = load_all_to_dataframes()
+                print("[OK] Podaci učitani iz baze.")
             except Exception as e:
-                print(f"[WARN] Spajanje sa bazom nije uspelo: {e}")
+                print(f"[WARN] Baza nije dostupna ({e}). Aplikacija radi u demo režimu.")
+                CACHE["db_dataframes"] = {}
+
+        if CACHE["slojevi"] is None:
+            CACHE["slojevi"] = load_serbia_shapefiles()
+            if CACHE["db_dataframes"]:
+                try:
+                    CACHE["merged_df"] = merge_shp_with_db(
+                        CACHE["slojevi"], CACHE["db_dataframes"]
+                    )
+                except Exception as e:
+                    print(f"[WARN] Spajanje sa bazom nije uspelo: {e}")
+                    CACHE["merged_df"] = None
+            else:
                 CACHE["merged_df"] = None
-        else:
-            CACHE["merged_df"] = None
 
-    if CACHE["raster_path"] is None:
-        CACHE["raster_path"] = create_ndvi_demo_raster()
+        if CACHE["raster_path"] is None:
+            CACHE["raster_path"] = create_ndvi_demo_raster()
 
-    if CACHE["overlay_rezultati"] is None:
-        CACHE["overlay_rezultati"] = run_all_overlay_demos(CACHE["slojevi"])
+        if CACHE["overlay_rezultati"] is None:
+            CACHE["overlay_rezultati"] = run_all_overlay_demos(CACHE["slojevi"])
 
-    if CACHE["ml_gdf"] is None:
-        model, scaler, le = load_trained_model()
-        CACHE["ml_gdf"] = detect_crops_on_raster(CACHE["raster_path"])
+        if CACHE["ml_gdf"] is None:
+            model, scaler, le = load_trained_model()
+            CACHE["ml_gdf"] = detect_crops_on_raster(CACHE["raster_path"])
+            try:
+                ml_df = save_detections_to_postgis(CACHE["ml_gdf"])
+                if isinstance(ml_df, pd.DataFrame):
+                    CACHE["ml_df"] = ml_df
+            except Exception as e:
+                print(f"[WARN] ML upis u PostGIS nije uspeo: {e}")
+                CACHE["ml_df"] = CACHE["ml_gdf"]
+
+        if CACHE["ml_analize"] is None:
+            CACHE["ml_analize"] = run_ml_spatial_analysis(CACHE["ml_gdf"], CACHE["slojevi"])
+
+        if CACHE["join_results"] is None:
+            try:
+                CACHE["join_results"] = run_join_queries()
+                print("[OK] JOIN upiti izvršeni.")
+            except Exception as e:
+                print(f"[WARN] JOIN upiti nisu uspeli (baza nedostupna): {e}")
+                CACHE["join_results"] = {}
+
+        # Generiši interaktivnu mapu
+        ndvi_tile_url = get_ndvi_tile_url()
         try:
-            ml_df = save_detections_to_postgis(CACHE["ml_gdf"])
-            if isinstance(ml_df, pd.DataFrame):
-                CACHE["ml_df"] = ml_df
+            create_interactive_map(
+                slojevi=CACHE["slojevi"],
+                overlay_rezultati=CACHE["overlay_rezultati"],
+                ml_vektor=CACHE["ml_gdf"],
+                raster_path=CACHE["raster_path"],
+                ndvi_tile_url=ndvi_tile_url,
+                output_file="data/interactive_map.html",
+            )
+            print("[OK] Mapa je regenerisana.")
         except Exception as e:
-            print(f"[WARN] ML upis u PostGIS nije uspeo: {e}")
-            CACHE["ml_df"] = CACHE["ml_gdf"]
+            print(f"[WARN] Mapa nije kreirana: {e}")
 
-    if CACHE["ml_analize"] is None:
-        CACHE["ml_analize"] = run_ml_spatial_analysis(CACHE["ml_gdf"], CACHE["slojevi"])
-
-    if CACHE["join_results"] is None:
-        try:
-            CACHE["join_results"] = run_join_queries()
-            print("[OK] JOIN upiti izvršeni.")
-        except Exception as e:
-            print(f"[WARN] JOIN upiti nisu uspeli (baza nedostupna): {e}")
-            CACHE["join_results"] = {}
-
-    # Generiši interaktivnu mapu
-    ndvi_tile_url = get_ndvi_tile_url()
-    try:
-        create_interactive_map(
-            slojevi=CACHE["slojevi"],
-            overlay_rezultati=CACHE["overlay_rezultati"],
-            ml_vektor=CACHE["ml_gdf"],
-            raster_path=CACHE["raster_path"],
-            ndvi_tile_url=ndvi_tile_url,
-            output_file="data/interactive_map.html",
-        )
-        print("[OK] Mapa je regenerisana.")
-    except Exception as e:
-        print(f"[WARN] Mapa nije kreirana: {e}")
-
-    print("[INIT] Inicijalizacija završena.")
+        # VAŽNO: flag se postavlja tek OVDE, pošto je sve zaista završeno.
+        # Ako bi se postavio na početku funkcije (kao ranije), request koji
+        # stigne dok inicijalizacija još traje bi video _initialized=True,
+        # preskočio čekanje i pročitao CACHE polja koja su još None
+        # (odatle 500 greške na /api/dashboard i /api/joins).
+        CACHE["_initialized"] = True
+        print("[INIT] Inicijalizacija završena.")
 
 
 def _refresh_cache():
@@ -293,7 +309,7 @@ def api_join_queries():
     """Vraća rezultate JOIN upita."""
     _init_all_data()
     rezultati = {}
-    for naziv, df in CACHE["join_results"].items():
+    for naziv, df in (CACHE.get("join_results") or {}).items():
         rezultati[naziv] = _df_to_dict(df)
     return jsonify(rezultati)
 
@@ -484,7 +500,7 @@ def api_dashboard():
             ),
             "gis_layers": list(slojevi.keys()) if slojevi else [],
             "overlay_count": len(CACHE.get("overlay_rezultati", {})),
-            "join_queries_count": len(CACHE.get("join_results", {})),
+            "join_queries_count": len(CACHE.get("join_results") or {}),
         }
     )
 

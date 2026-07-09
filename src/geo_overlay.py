@@ -36,7 +36,11 @@ def run_all_overlay_demos(slojevi):
         roads_sample = roads.sample(n=min(len(roads), MAX_SAMPLE), random_state=42)
         roads_utm = roads_sample.to_crs("EPSG:32634")  # UTM zone 34N
         roads_utm["buffer_200m"] = roads_utm.geometry.buffer(200)
-        roads_buf = roads_utm.set_geometry("buffer_200m").to_crs(CRS_WGS84)
+        roads_buf = (
+            roads_utm.set_geometry("buffer_200m")
+            .drop(columns=["geometry"])  # stara LineString kolona bi inače pukla na to_json()
+            .to_crs(CRS_WGS84)
+        )
         rezultati["buffer_putevi_200m"] = roads_buf
         print(f"   Kreirano {len(roads_buf)} buffer zona oko puteva (uzorak {MAX_SAMPLE}).")
 
@@ -45,7 +49,11 @@ def run_all_overlay_demos(slojevi):
             bld_sample = buildings.sample(n=min(len(buildings), MAX_SAMPLE), random_state=42)
             bld_utm = bld_sample.to_crs("EPSG:32634")
             bld_utm["buffer_500m"] = bld_utm.geometry.buffer(500)
-            bld_buf = bld_utm.set_geometry("buffer_500m").to_crs(CRS_WGS84)
+            bld_buf = (
+                bld_utm.set_geometry("buffer_500m")
+                .drop(columns=["geometry"])  # stara Polygon kolona bi inače pukla na to_json()
+                .to_crs(CRS_WGS84)
+            )
             rezultati["buffer_objekti_500m"] = bld_buf
             print(f"   Kreirano {len(bld_buf)} buffer zona oko objekata (500m, uzorak).")
     else:
@@ -68,7 +76,8 @@ def run_all_overlay_demos(slojevi):
                 )
             )
             clipped = clipped.dropna(subset=["geometry"])
-            if not clipped.is_empty.any():
+            clipped = clipped[~clipped.geometry.is_empty]
+            if len(clipped) > 0:
                 rezultati["clip_landuse_putevi"] = clipped
                 print(f"   Isečeno {len(clipped)} landuse poligona unutar zone puteva.")
             else:

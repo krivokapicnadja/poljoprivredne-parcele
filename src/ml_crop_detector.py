@@ -798,7 +798,10 @@ def run_ml_spatial_analysis(gdf_ml, slojevi=None):
             lsuffix="ml",
             rsuffix="lu",
         )
-        preklapa = ml_with_landuse["index_lu"].notna().sum()
+        # sjoin(how="left") vraća po jedan red za SVAKI landuse poligon koji
+        # preseca datu detekciju, pa .notna().sum() broji redove spoja, a ne
+        # jedinstvene detekcije. Zato brojimo unikatne indekse iz gdf_ml.
+        preklapa = ml_with_landuse[ml_with_landuse["index_lu"].notna()].index.nunique()
         print(f"   {preklapa}/{len(gdf_ml)} ML detekcija se preklapa sa landuse.")
         rezultati["ml_landuse_overlap"] = ml_with_landuse
 
